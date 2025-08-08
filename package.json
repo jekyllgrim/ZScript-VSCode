@@ -7,14 +7,22 @@
     "version": "1.9.4",
     "repository": {
         "type": "git",
-        "url": "https://github.com/KaptainMicila/ZScript-VSCode.git"
+        "url": "git+https://github.com/KaptainMicila/ZScript-VSCode.git"
     },
     "engines": {
-        "vscode": "^1.52.0"
+        "vscode": "^1.80.0"
     },
     "categories": [
         "Programming Languages"
     ],
+    "activationEvents": [
+        "onLanguage:zscript",
+        "onCommand:zscript.parsePk3",
+        "onCommand:zscript.listFiles",
+        "onCommand:zscript.parseTestFile",
+        "onStartupFinished"
+    ],
+    "main": "./extension.js",
     "contributes": {
         "languages": [
             {
@@ -755,13 +763,33 @@
                 "scopeName": "source.sndseq",
                 "path": "./syntaxes/sndseq.tmLanguage.json"
             }
+        ],
+        "configuration": {
+            "title": "ZScript",
+            "properties": {
+                "zscript.gzdoomPk3Path": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to gzdoom.pk3 (the core GZDoom file) to parse for built-in functions."
+                }
+            }
+        },
+        "commands": [
+            {
+                "command": "zscript.parsePk3",
+                "title": "ZScript: Parse gzdoom.pk3 for Functions"
+            },
+            {
+                "command": "zscript.listFiles",
+                "title": "ZScript: List ZScript Files in gzdoom.pk3"
+            },
+            {
+                "command": "zscript.parseTestFile",
+                "title": "ZScript: Parse Test File (zscriptref.txt)"
+            }
         ]
     },
-    "author": {
-        "name": "Micila \"Kaptain\" Micillotto",
-        "email": "micillotto+zdoomsupport@gmail.com",
-        "url": "https://kaptainmicila.itch.io/"
-    },
+    "author": "Micila \"Kaptain\" Micillotto <micillotto+zdoomsupport@gmail.com> (https://kaptainmicila.itch.io/)",
     "bugs": {
         "url": "https://github.com/KaptainMicila/ZScript-VSCode/issues",
         "email": "micillotto+zdoomsupport@gmail.com"
@@ -773,5 +801,12 @@
         "acs",
         "zdoom",
         "gzdoom"
-    ]
+    ],
+    "main": "./extension.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "adm-zip": "^0.5.16"
+    }
 }
