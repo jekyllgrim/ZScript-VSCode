@@ -6,13 +6,13 @@ let functionSignatures = new Map();
 let outputChannel = null;
 
 // Parse ZScript text for function signatures at brace depth 1
-function parseZScriptText(text, fileName) {
+function parseZScriptText(text, fileName, verbose = false) {
   outputChannel.appendLine(`Parsing file: ${fileName}`);
   text = text.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove multi-line comments
   text = text.replace(/\/\/.*$/gm, ''); // Remove single-line comments
 
   // Regex for function signatures
-  const funcRegex = /(?:\b(?:native|static|virtual|protected|private|clearscope|action|ui|play|const|override|vararg|out|in|readonly|deprecated\("[^"]*"(?:,\s*"[^"]*")?\)|version\("[^"]*"\))\s+)*((?:\w+(?:\s+\w+)*(?:\s*,\s*\w+(?:\s+\w+)*)*)?)\s+(\w+)\s*\(\s*([^)]*?(?:\s*,\s*\.\.\.)?)\s*\)\s*(?:const)?\s*[;{]/;
+  const funcRegex = /(?:\b(?:native|static|virtual|protected|private|clearscope|action|ui|play|const|override|vararg|out|in|readonly|deprecated\("[^"]*"(?:,\s*"[^"]*")?\)|version\("[^"]*"\))\s+)*((?:\w+(?:\s+\w+)*(?:\s*,\s*\w+(?:\s+\w+)*)*)?)\s+(\w+)\s*\(\s*([^)]*?(?:\s*,\s*\.\..\.)?)\s*\)\s*(?:const)?\s*[;{]/;
   // Regex for class/struct declarations
   const structRegex = /\b(class|struct)\s+(\w+)/;
   let braceDepth = 0;
@@ -21,9 +21,11 @@ function parseZScriptText(text, fileName) {
   let functionsFound = 0;
   let currentLine = '';
 
-  outputChannel.appendLine(`First 20 lines of ${fileName}:`);
-  for (let i = 0; i < Math.min(20, lines.length); i++) {
-    outputChannel.appendLine(`Line ${i}: ${lines[i].trim()}`);
+  if (verbose) {
+    outputChannel.appendLine(`First 20 lines of ${fileName}:`);
+    for (let i = 0; i < Math.min(20, lines.length); i++) {
+      outputChannel.appendLine(`Line ${i}: ${lines[i].trim()}`);
+    }
   }
 
   for (let i = 0; i < lines.length; i++) {
@@ -40,7 +42,7 @@ function parseZScriptText(text, fileName) {
     }
 
     // Debug all lines in actor.zs with depth
-    if (fileName.toLowerCase().endsWith('actor.zs')) {
+    if (verbose && fileName.toLowerCase().endsWith('actor.zs')) {
       outputChannel.appendLine(`Debug actor.zs line ${i} (depth ${braceDepth}): "${line}"`);
     }
 
@@ -49,19 +51,19 @@ function parseZScriptText(text, fileName) {
     if (structMatch && braceDepth === 0) {
       currentStructure.type = structMatch[1]; // class or struct
       currentStructure.name = structMatch[2]; // e.g., Actor, Translate
-      outputChannel.appendLine(`Line ${i} detected ${currentStructure.type} ${currentStructure.name}`);
+      if (verbose) outputChannel.appendLine(`Line ${i} detected ${currentStructure.type} ${currentStructure.name}`);
     }
 
     // Parse functions only at brace depth 1
     if (braceDepth === 1) {
       // Skip lines with 'else if' or reserved keywords
       if (line.match(/\belse\s+if\b/)) {
-        outputChannel.appendLine(`Line ${i} skipped (else if, depth ${braceDepth}): "${line}"`);
+        if (verbose) outputChannel.appendLine(`Line ${i} skipped (else if, depth ${braceDepth}): "${line}"`);
         continue;
       }
 
       // Debug potential function lines in actor.zs
-      if (fileName.toLowerCase().endsWith('actor.zs') && line.match(/\w+\s+\w+\s*\(/)) {
+      if (verbose && fileName.toLowerCase().endsWith('actor.zs') && line.match(/\w+\s+\w+\s*\(/)) {
         outputChannel.appendLine(`Debug actor.zs potential function line ${i} (depth ${braceDepth}): "${line}"`);
       }
 
@@ -73,7 +75,7 @@ function parseZScriptText(text, fileName) {
 
         // Validate function name
         if (name.match(/^(if|else|while|for|return|struct|class)$/)) {
-          outputChannel.appendLine(`Line ${i} skipped (invalid function name, depth ${braceDepth}): "${line}"`);
+          if (verbose) outputChannel.appendLine(`Line ${i} skipped (invalid function name, depth ${braceDepth}): "${line}"`);
           continue;
         }
 
@@ -100,18 +102,18 @@ function parseZScriptText(text, fileName) {
         const sig = new vscode.SignatureInformation(signatureLabel);
         sig.parameters = paramInfos;
         if (currentStructure.type && currentStructure.name) {
-          sig.documentation = `Built-in function. Defined in: ${currentStructure.type} ${currentStructure.name}`;
+          sig.documentation = new vscode.MarkdownString(`Built-in function. Defined in: ${currentStructure.type} ${currentStructure.name}`);
         } else {
-          sig.documentation = 'Built-in ZScript function';
+          sig.documentation = new vscode.MarkdownString('Built-in ZScript function');
         }
 
         functionSignatures.set(name, sig);
         functionsFound++;
-        outputChannel.appendLine(`Found function: ${signatureLabel} at line ${i} (depth ${braceDepth})`);
-      } else if (line.match(/\w+\s+\w+\s*\(/)) {
+        if (verbose) outputChannel.appendLine(`Found function: ${signatureLabel} at line ${i} (depth ${braceDepth})`);
+      } else if (verbose && line.match(/\w+\s+\w+\s*\(/)) {
         outputChannel.appendLine(`Line ${i} partial function match (depth ${braceDepth}): "${line}"`);
       }
-    } else {
+    } else if (verbose) {
       outputChannel.appendLine(`Line ${i} skipped (depth ${braceDepth}): "${line}"`);
     }
 
@@ -119,14 +121,14 @@ function parseZScriptText(text, fileName) {
     for (let char of line) {
       if (char === '{') {
         braceDepth++;
-        outputChannel.appendLine(`Line ${i} braceDepth increased to ${braceDepth}: "${line}"`);
+        if (verbose) outputChannel.appendLine(`Line ${i} braceDepth increased to ${braceDepth}: "${line}"`);
       } else if (char === '}') {
         braceDepth--;
         if (braceDepth < 0) braceDepth = 0; // Prevent negative depth
-        outputChannel.appendLine(`Line ${i} braceDepth decreased to ${braceDepth}: "${line}"`);
+        if (verbose) outputChannel.appendLine(`Line ${i} braceDepth decreased to ${braceDepth}: "${line}"`);
         if (braceDepth === 0) {
           currentStructure = { type: null, name: null }; // Reset structure context
-          outputChannel.appendLine(`Line ${i} exited structure context`);
+          if (verbose) outputChannel.appendLine(`Line ${i} exited structure context`);
         }
       }
     }
@@ -137,50 +139,52 @@ function parseZScriptText(text, fileName) {
 }
 
 // Parse the entire PK3
-function parsePk3() {
+function parsePk3(verbose = false) {
   try {
-    outputChannel.appendLine('Starting parsePk3 command');
+    outputChannel.appendLine('Started parsing gzdoom.pk3');
     const pk3Path = vscode.workspace.getConfiguration('zscript').get('gzdoomPk3Path');
-    outputChannel.appendLine(`PK3 path from settings: ${pk3Path}`);
+    if (verbose) outputChannel.appendLine(`PK3 path from settings: ${pk3Path}`);
     if (!pk3Path) {
       vscode.window.showErrorMessage('Set the "zscript.gzdoomPk3Path" in settings first.');
       outputChannel.appendLine('No PK3 path set');
       return;
     }
 
-    outputChannel.appendLine(`Attempting to open PK3: ${pk3Path}`);
+    if (verbose) outputChannel.appendLine(`Attempting to open PK3: ${pk3Path}`);
     const zip = new AdmZip(pk3Path);
     const entries = zip.getEntries();
-    outputChannel.appendLine(`Found ${entries.length} entries in PK3`);
+    if (verbose) outputChannel.appendLine(`Found ${entries.length} entries in PK3`);
     functionSignatures.clear();
     let totalFunctions = 0;
     let filesProcessed = 0;
 
-    // Log all entries for debugging
-    outputChannel.appendLine('Listing all PK3 entries:');
-    entries.forEach(entry => {
-      outputChannel.appendLine(`PK3 entry: ${entry.entryName}`);
-    });
+    if (verbose) {
+      outputChannel.appendLine('Listing all PK3 entries:');
+      entries.forEach(entry => {
+        outputChannel.appendLine(`PK3 entry: ${entry.entryName}`);
+      });
+    }
 
     entries.forEach(entry => {
       const entryNameLower = entry.entryName.toLowerCase();
       if (entryNameLower.startsWith('zscript/') && !entry.isDirectory) {
-        outputChannel.appendLine(`Found file in PK3: ${entry.entryName}`);
+        if (verbose) outputChannel.appendLine(`Found file in PK3: ${entry.entryName}`);
         if (!entryNameLower.endsWith('.txt')) {
-          outputChannel.appendLine(`Processing ZScript file: ${entry.entryName}`);
+          if (verbose) outputChannel.appendLine(`Processing ZScript file: ${entry.entryName}`);
           const text = zip.readAsText(entry);
-          totalFunctions += parseZScriptText(text, entry.entryName);
+          totalFunctions += parseZScriptText(text, entry.entryName, verbose);
           filesProcessed++;
         } else {
-          outputChannel.appendLine(`Skipped text file: ${entry.entryName}`);
+          if (verbose) outputChannel.appendLine(`Skipped text file: ${entry.entryName}`);
         }
       } else {
-        outputChannel.appendLine(`Skipped non-ZScript file: ${entry.entryName}`);
+        if (verbose) outputChannel.appendLine(`Skipped non-ZScript file: ${entry.entryName}`);
       }
     });
 
     outputChannel.appendLine(`Processed ${filesProcessed} ZScript files with ${totalFunctions} functions`);
     outputChannel.appendLine(`Total function signatures: ${functionSignatures.size}`);
+    outputChannel.appendLine('Finished parsing gzdoom.pk3');
     vscode.window.showInformationMessage(`Parsed ${totalFunctions} built-in functions from gzdoom.pk3`);
   } catch (error) {
     vscode.window.showErrorMessage(`Error parsing gzdoom.pk3: ${error.message}`);
@@ -225,60 +229,30 @@ function listZScriptFiles() {
   }
 }
 
-// Test parsing zscriptref.txt
-function parseTestFile() {
-  try {
-    outputChannel.appendLine('Starting parseTestFile command');
-    const testFilePath = 'c:/Users/mi/My Drive/_MyDoomProjects/ZScript-VSCode/zscriptref.txt';
-    if (!fs.existsSync(testFilePath)) {
-      vscode.window.showErrorMessage('Test file zscriptref.txt not found');
-      outputChannel.appendLine('Test file not found: ' + testFilePath);
-      return;
-    }
-    const text = fs.readFileSync(testFilePath, 'utf8');
-    outputChannel.appendLine(`First 20 lines of zscriptref.txt:`);
-    const lines = text.split('\n').slice(0, 20);
-    lines.forEach((line, i) => {
-      outputChannel.appendLine(`Line ${i}: ${line.trim()}`);
-    });
-    functionSignatures.clear();
-    const functionsFound = parseZScriptText(text, 'zscriptref.txt');
-    outputChannel.appendLine(`Parsed ${functionsFound} functions from test file`);
-    outputChannel.appendLine(`Total function signatures: ${functionSignatures.size}`);
-    vscode.window.showInformationMessage(`Parsed ${functionsFound} functions from zscriptref.txt`);
-  } catch (error) {
-    vscode.window.showErrorMessage(`Error parsing test file: ${error.message}`);
-    outputChannel.appendLine(`Error parsing test file: ${error.message}\n${error.stack}`);
-  }
-}
-
 // Extension activation
-function activate(context) {
+exports.activate = function(context) {
   try {
     outputChannel = vscode.window.createOutputChannel('ZScript Extension');
     outputChannel.appendLine('Extension activated: kaptainmicila.gzdoom-zscript');
 
     // Register commands
-    const parsePk3Command = vscode.commands.registerCommand('zscript.parsePk3', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('zscript.parsePk3', () => {
       outputChannel.appendLine('Command zscript.parsePk3 triggered');
-      parsePk3();
-    });
-    context.subscriptions.push(parsePk3Command);
+      parsePk3(false); // Non-verbose
+    }));
     outputChannel.appendLine('Command zscript.parsePk3 registered');
 
-    const listFilesCommand = vscode.commands.registerCommand('zscript.listFiles', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('zscript.parsePk3Verbose', () => {
+      outputChannel.appendLine('Command zscript.parsePk3Verbose triggered');
+      parsePk3(true); // Verbose
+    }));
+    outputChannel.appendLine('Command zscript.parsePk3Verbose registered');
+
+    context.subscriptions.push(vscode.commands.registerCommand('zscript.listFiles', () => {
       outputChannel.appendLine('Command zscript.listFiles triggered');
       listZScriptFiles();
-    });
-    context.subscriptions.push(listFilesCommand);
+    }));
     outputChannel.appendLine('Command zscript.listFiles registered');
-
-    const parseTestFileCommand = vscode.commands.registerCommand('zscript.parseTestFile', () => {
-      outputChannel.appendLine('Command zscript.parseTestFile triggered');
-      parseTestFile();
-    });
-    context.subscriptions.push(parseTestFileCommand);
-    outputChannel.appendLine('Command zscript.parseTestFile registered');
 
     // Register signature help provider with named argument support
     context.subscriptions.push(vscode.languages.registerSignatureHelpProvider('zscript', {
@@ -360,7 +334,7 @@ function activate(context) {
           if (name.startsWith(prefix)) {
             const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
             item.detail = signature.label;
-            item.documentation = new vscode.MarkdownString(signature.documentation);
+            item.documentation = signature.documentation;
             completions.push(item);
           }
         }
@@ -368,13 +342,11 @@ function activate(context) {
         outputChannel.appendLine(`Providing ${completions.length} completion items for prefix: ${prefix}`);
         return completions;
       }
-    }, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'));
+    }, ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_".split('')));
 
     outputChannel.appendLine('All commands and providers registered successfully');
   } catch (error) {
     outputChannel.appendLine(`Extension activation failed: ${error.message}\n${error.stack}`);
     vscode.window.showErrorMessage(`ZScript Extension activation failed: ${error.message}`);
   }
-}
-
-exports.activate = activate;
+};

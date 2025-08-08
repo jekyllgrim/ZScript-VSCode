@@ -4,7 +4,7 @@
     "description": "GZDoom's multiple scripting languages support (with a focus on ZScript) for VSCode (and compatible editors)",
     "publisher": "kaptainmicila",
     "icon": "icons/GZDoom.png",
-    "version": "1.9.4",
+    "version": "1.9.6",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/KaptainMicila/ZScript-VSCode.git"
@@ -18,8 +18,8 @@
     "activationEvents": [
         "onLanguage:zscript",
         "onCommand:zscript.parsePk3",
+        "onCommand:zscript.parsePk3Verbose",
         "onCommand:zscript.listFiles",
-        "onCommand:zscript.parseTestFile",
         "onStartupFinished"
     ],
     "main": "./extension.js",
@@ -780,12 +780,12 @@
                 "title": "ZScript: Parse gzdoom.pk3 for Functions"
             },
             {
-                "command": "zscript.listFiles",
-                "title": "ZScript: List ZScript Files in gzdoom.pk3"
+                "command": "zscript.parsePk3Verbose",
+                "title": "ZScript: Parse gzdoom.pk3 for Functions (Verbose Debugging)"
             },
             {
-                "command": "zscript.parseTestFile",
-                "title": "ZScript: Parse Test File (zscriptref.txt)"
+                "command": "zscript.listFiles",
+                "title": "ZScript: List ZScript Files in gzdoom.pk3"
             }
         ]
     },
