@@ -71,7 +71,7 @@ function parseZScriptText(text, fileName, verbose = false) {
           currentStructure.name ? `Defined in: ${currentStructure.type} ${currentStructure.name}` : 'Built-in ZScript function'
         );
 
-        //functionSignatures.set(name.toLowerCase(), sig);
+        functionSignatures.set(name.toLowerCase(), sig);
         functionsFound++;
       }
     }
