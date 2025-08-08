@@ -186,8 +186,8 @@ exports.activate = function(context) {
         const funcMatch = lineText.match(/(\w+)\s*\(\s*[^)]*$/);
         if (!funcMatch) return null;
 
-        const funcName = funcMatch[1].toLowerCase();
-        const signature = functionSignatures.get(funcName);
+        const funcName = funcMatch[1];
+        const signature = functionSignatures.get(funcName.toLowerCase());
         if (!signature) return null;
 
         const openParenPos = lineText.lastIndexOf('(');
@@ -215,25 +215,28 @@ exports.activate = function(context) {
     }, '(', ',', ':'));
 
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('zscript', {
-      provideCompletionItems(document, position) {
-        const lineText = document.lineAt(position).text.substring(0, position.character);
-        const wordMatch = lineText.match(/\b(\w*)$/);
-        if (!wordMatch) return [];
+	  provideCompletionItems(document, position) {
+	    const lineText = document.lineAt(position).text.substring(0, position.character);
+	    const wordMatch = lineText.match(/\b(\w*)$/);
+	    if (!wordMatch) return [];
 
-        const prefix = wordMatch[1].toLowerCase();
-        const completions = [];
+	    const prefix = wordMatch[1];
+	    const completions = [];
 
-        for (const [name, signature] of functionSignatures.entries()) {
-          if (name.startsWith(prefix)) {
-            const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
-            item.detail = signature.label;
-            item.documentation = signature.documentation;
-            completions.push(item);
-          }
-        }
+	    for (const [name, signature] of functionSignatures.entries()) {
+	  	if (name.toLowerCase().startsWith(prefix.toLowerCase())) {
+	  	  // Extract original case function name from signature.label
+	  	  const originalName = signature.label.match(/^\w+\s+(\w+)\s*\(/)[1];
+	  	  const item = new vscode.CompletionItem(originalName, vscode.CompletionItemKind.Function);
+	  	  item.detail = signature.label;
+	  	  item.documentation = signature.documentation;
+	  	  completions.push(item);
+	  	}
+	    }
 
-        return completions;
-      }
+	    outputChannel.appendLine(`Providing ${completions.length} completion items for prefix: ${prefix}`);
+	    return completions;
+	  }
     }, ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')));
 
     vscode.workspace.onDidOpenTextDocument(doc => {
