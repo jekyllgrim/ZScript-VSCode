@@ -71,7 +71,10 @@ function parseZScriptText(text, fileName, verbose = false) {
           currentStructure.name ? `Defined in: ${currentStructure.type} ${currentStructure.name}` : 'Built-in ZScript function'
         );
 
-        functionSignatures.set(name.toLowerCase(), sig);
+        functionSignatures.set(name.toLowerCase(), {
+          signature: sig,
+          originalName: name
+		    });
         functionsFound++;
       }
     }
@@ -186,9 +189,11 @@ exports.activate = function(context) {
         const funcMatch = lineText.match(/(\w+)\s*\(\s*[^)]*$/);
         if (!funcMatch) return null;
 
-        const funcName = funcMatch[1];
-        const signature = functionSignatures.get(funcName.toLowerCase());
-        if (!signature) return null;
+        const funcName = funcMatch[1].toLowerCase();
+        const sigObj = functionSignatures.get(funcName);
+        if (!sigObj) return null;
+
+        const signature = sigObj.signature;
 
         const openParenPos = lineText.lastIndexOf('(');
         const argsText = lineText.substring(openParenPos + 1);
@@ -215,28 +220,25 @@ exports.activate = function(context) {
     }, '(', ',', ':'));
 
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('zscript', {
-	  provideCompletionItems(document, position) {
-	    const lineText = document.lineAt(position).text.substring(0, position.character);
-	    const wordMatch = lineText.match(/\b(\w*)$/);
-	    if (!wordMatch) return [];
+        provideCompletionItems(document, position) {
+        const lineText = document.lineAt(position).text.substring(0, position.character);
+        const wordMatch = lineText.match(/\b(\w*)$/);
+        if (!wordMatch) return [];
 
-	    const prefix = wordMatch[1];
-	    const completions = [];
+        const prefix = wordMatch[1].toLowerCase();
+        const completions = [];
 
-	    for (const [name, signature] of functionSignatures.entries()) {
-	  	if (name.toLowerCase().startsWith(prefix.toLowerCase())) {
-	  	  // Extract original case function name from signature.label
-	  	  const originalName = signature.label.match(/^\w+\s+(\w+)\s*\(/)[1];
-	  	  const item = new vscode.CompletionItem(originalName, vscode.CompletionItemKind.Function);
-	  	  item.detail = signature.label;
-	  	  item.documentation = signature.documentation;
-	  	  completions.push(item);
-	  	}
-	    }
+        for (const [key, data] of functionSignatures.entries()) {
+          if (key.startsWith(prefix)) {
+            const item = new vscode.CompletionItem(data.originalName, vscode.CompletionItemKind.Function);
+            item.detail = data.signature.label;
+            item.documentation = data.signature.documentation;
+            completions.push(item);
+          }
+        }
 
-	    outputChannel.appendLine(`Providing ${completions.length} completion items for prefix: ${prefix}`);
-	    return completions;
-	  }
+        return completions;
+      }
     }, ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')));
 
     vscode.workspace.onDidOpenTextDocument(doc => {
