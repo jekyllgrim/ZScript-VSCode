@@ -199,16 +199,69 @@ exports.activate = function(context) {
         const argsText = lineText.substring(openParenPos + 1);
         const args = argsText.split(',').map(a => a.trim()).filter(Boolean);
 
-        let currentIndex = 0;
-        for (let i = 0; i < args.length - 1; i++) {
-          if (args[i].includes(':')) {
-            const name = args[i].split(':')[0];
-            const paramIndex = signature.parameters.findIndex(p => p.label === name);
-            if (paramIndex !== -1) currentIndex = paramIndex + 1;
+        const rawArgs = argsText.split(','); // do not trim everything yet
+        let currentArgIndex = rawArgs.length - 1; // index in typed args
+        let namedArgsUsed = new Set();
+        let unnamedCounter = 0;
+
+        // Track named params from previous args
+        for (let i = 0; i < currentArgIndex; i++) {
+          const raw = rawArgs[i].trim();
+          if (raw.includes(':')) {
+            const name = raw.split(':')[0].trim().toLowerCase();
+            const paramIndex = signature.parameters.findIndex(
+              p => p.label.toLowerCase() === name ||
+                  p.label.toLowerCase().startsWith(name) // partial match
+            );
+            if (paramIndex !== -1) {
+              namedArgsUsed.add(paramIndex);
+            }
           } else {
-            currentIndex++;
+            // Assign unnamed params in order, skipping those already named
+            while (unnamedCounter < signature.parameters.length &&
+                  namedArgsUsed.has(unnamedCounter)) {
+              unnamedCounter++;
+            }
+            unnamedCounter++;
           }
         }
+
+        // Now detect the param for the *current* arg being typed
+        const currentRaw = rawArgs[currentArgIndex].trim();
+        let currentIndex;
+        const colonPos = currentRaw.indexOf(':');
+        const firstToken = (colonPos !== -1 ? currentRaw.split(':')[0] : currentRaw).trim();
+        if (/^[A-Za-z_]/.test(firstToken)) {
+          // Try matching as a (full or partial) parameter name
+          const name = firstToken.toLowerCase();
+          const paramIndex = signature.parameters.findIndex(
+            p => p.label.toLowerCase() === name ||
+                p.label.toLowerCase().startsWith(name)
+          );
+          if (paramIndex !== -1) {
+            currentIndex = paramIndex;
+          } else {
+            // No match found — fallback to positional
+            while (unnamedCounter < signature.parameters.length &&
+                  namedArgsUsed.has(unnamedCounter)) {
+              unnamedCounter++;
+            }
+            currentIndex = unnamedCounter;
+          }
+        } else {
+          // Not starting with a letter/underscore → positional
+          while (unnamedCounter < signature.parameters.length &&
+                namedArgsUsed.has(unnamedCounter)) {
+            unnamedCounter++;
+          }
+          currentIndex = unnamedCounter;
+        }
+
+
+        if (currentIndex === -1) {
+          currentIndex = 0; // fallback if unknown
+        }
+
 
         const help = new vscode.SignatureHelp();
         help.signatures = [signature];
