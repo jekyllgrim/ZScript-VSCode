@@ -8,7 +8,7 @@ let functionSignatures = new Map();
 let outputChannel = null;
 let parsedProjectPaths = new Set();
 
-function parseZScriptText(text, fileName, verbose = false) {
+function parseZScriptText(text, fileName, verbose = false, sourceLabel = 'GZDoom') {
   outputChannel.appendLine(`Parsing file: ${fileName}`);
   text = text.replace(/\/\*[\s\S]*?\*\//g, ''); // Remove multi-line comments
   text = text.replace(/\/\/.*$/gm, ''); // Remove single-line comments
@@ -67,9 +67,16 @@ function parseZScriptText(text, fileName, verbose = false) {
         const signatureLabel = `${returnType} ${name}(${paramsStr})`;
         const sig = new vscode.SignatureInformation(signatureLabel);
         sig.parameters = paramInfos;
-        sig.documentation = new vscode.MarkdownString(
-          currentStructure.name ? `Defined in: ${currentStructure.type} ${currentStructure.name}` : 'Built-in ZScript function'
-        );
+        let docText;
+        if (currentStructure.name) {
+          docText = `${sourceLabel} function. Defined in: ${currentStructure.type} ${currentStructure.name}`;
+        } else {
+          docText = `${sourceLabel} function`;
+        }
+        sig.documentation = new vscode.MarkdownString(docText);
+
+        sig.documentation = new vscode.MarkdownString(docText);
+
 
         functionSignatures.set(name.toLowerCase(), {
           signature: sig,
@@ -114,7 +121,7 @@ function parsePk3(verbose = false) {
       const entryNameLower = entry.entryName.toLowerCase();
       if (entryNameLower.startsWith('zscript/') && !entry.isDirectory && !entryNameLower.endsWith('.txt')) {
         const text = zip.readAsText(entry);
-        totalFunctions += parseZScriptText(text, entry.entryName, verbose);
+        totalFunctions += parseZScriptText(text, entry.entryName, verbose, 'GZDoom');
       }
     });
 
@@ -129,7 +136,9 @@ function parsePk3(verbose = false) {
 function parseProjectFromRootZScript(rootDoc) {
   const rootDir = path.dirname(rootDoc.uri.fsPath);
   const alreadyParsed = new Set();
+  const projectLabel = path.basename(rootDir);
 
+  let totalFunctions = 0;
   function parseFileRecursively(filePath) {
     const normalizedPath = path.normalize(filePath).toLowerCase();
     if (alreadyParsed.has(normalizedPath)) return;
@@ -137,7 +146,8 @@ function parseProjectFromRootZScript(rootDoc) {
 
     if (!fs.existsSync(filePath)) return;
     const content = fs.readFileSync(filePath, 'utf8');
-    parseZScriptText(content, path.basename(filePath));
+    parseZScriptText(content, path.basename(filePath), false, projectLabel);
+    totalFunctions += parseZScriptText(content, path.basename(filePath), false, projectLabel);
 
     const includeRegex = /^\s*#include\s+"([^"]+)"\s*$/gmi;
     let match;
@@ -148,7 +158,8 @@ function parseProjectFromRootZScript(rootDoc) {
   }
 
   parseFileRecursively(rootDoc.uri.fsPath);
-  outputChannel.appendLine(`Finished parsing user project. Total functions: ${functionSignatures.size}`);
+  outputChannel.appendLine(`Finished parsing user project "${projectLabel}". Total functions: ${functionSignatures.size}`);
+  vscode.window.showInformationMessage(`Parsed ${totalFunctions} functions from ${projectLabel}`);
 }
 
 function tryParseProjectFromZScript(doc) {
