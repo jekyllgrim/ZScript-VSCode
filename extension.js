@@ -75,13 +75,10 @@ function parseZScriptText(text, fileName, verbose = false, sourceLabel = 'GZDoom
         }
         sig.documentation = new vscode.MarkdownString(docText);
 
-        sig.documentation = new vscode.MarkdownString(docText);
-
-
         functionSignatures.set(name.toLowerCase(), {
           signature: sig,
           originalName: name
-		    });
+        });
         functionsFound++;
       }
     }
@@ -108,7 +105,7 @@ function parsePk3(verbose = false) {
     outputChannel.appendLine('Started parsing gzdoom.pk3');
     const pk3Path = vscode.workspace.getConfiguration('zscript').get('gzdoomPk3Path');
     if (!pk3Path) {
-      vscode.window.showErrorMessage('Set the "zscript.gzdoomPk3Path" in settings first.');
+      vscode.window.showErrorMessage('Set the "zscript.gzdoomPk3Path" in settings first. Use the "ZScript: Browse for gzdoom.pk3 File" command to select a file.');
       return;
     }
 
@@ -181,18 +178,52 @@ function tryParseProjectFromZScript(doc) {
   }
 }
 
+async function browseGzdoomPk3() {
+  try {
+    outputChannel.appendLine('Browse gzdoom.pk3 command triggered');
+    const options = {
+      canSelectMany: false,
+      openLabel: 'Select gzdoom.pk3',
+      filters: {
+        'PK3 Files': ['pk3'],
+        'All Files': ['*']
+      }
+    };
+    const fileUri = await vscode.window.showOpenDialog(options);
+    if (fileUri && fileUri[0]) {
+      const filePath = fileUri[0].fsPath;
+      await vscode.workspace.getConfiguration('zscript').update('gzdoomPk3Path', filePath, vscode.ConfigurationTarget.Global);
+      vscode.window.showInformationMessage(`Selected gzdoom.pk3: ${filePath}`);
+      outputChannel.appendLine(`Selected gzdoom.pk3: ${filePath}`);
+    } else {
+      outputChannel.appendLine('No file selected in browse dialog');
+    }
+  } catch (error) {
+    vscode.window.showErrorMessage(`Error selecting gzdoom.pk3: ${error.message}`);
+    outputChannel.appendLine(`Error selecting gzdoom.pk3: ${error.message}`);
+  }
+}
+
 exports.activate = function(context) {
   try {
     outputChannel = vscode.window.createOutputChannel('ZScript Extension');
     outputChannel.appendLine('ZScript extension activated.');
 
     context.subscriptions.push(vscode.commands.registerCommand('zscript.parsePk3', () => {
+      outputChannel.appendLine('Parse gzdoom.pk3 command triggered');
       parsePk3(false);
     }));
 
     context.subscriptions.push(vscode.commands.registerCommand('zscript.parsePk3Verbose', () => {
+      outputChannel.appendLine('Parse gzdoom.pk3 (verbose) command triggered');
       parsePk3(true);
     }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('zscript.listFiles', () => {
+      outputChannel.appendLine('Listing ZScript files in gzdoom.pk3 (not implemented).');
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('zscript.browseGzdoomPk3', browseGzdoomPk3));
 
     context.subscriptions.push(vscode.languages.registerSignatureHelpProvider('zscript', {
       provideSignatureHelp(document, position) {
@@ -215,20 +246,18 @@ exports.activate = function(context) {
         let namedArgsUsed = new Set();
         let unnamedCounter = 0;
 
-        // Track named params from previous args
         for (let i = 0; i < currentArgIndex; i++) {
           const raw = rawArgs[i].trim();
           if (raw.includes(':')) {
             const name = raw.split(':')[0].trim().toLowerCase();
             const paramIndex = signature.parameters.findIndex(
               p => p.label.toLowerCase() === name ||
-                  p.label.toLowerCase().startsWith(name) // partial match
+                  p.label.toLowerCase().startsWith(name)
             );
             if (paramIndex !== -1) {
               namedArgsUsed.add(paramIndex);
             }
           } else {
-            // Assign unnamed params in order, skipping those already named
             while (unnamedCounter < signature.parameters.length &&
                   namedArgsUsed.has(unnamedCounter)) {
               unnamedCounter++;
@@ -237,13 +266,11 @@ exports.activate = function(context) {
           }
         }
 
-        // Now detect the param for the *current* arg being typed
         const currentRaw = rawArgs[currentArgIndex].trim();
         let currentIndex;
         const colonPos = currentRaw.indexOf(':');
         const firstToken = (colonPos !== -1 ? currentRaw.split(':')[0] : currentRaw).trim();
         if (/^[A-Za-z_]/.test(firstToken)) {
-          // Try matching as a (full or partial) parameter name
           const name = firstToken.toLowerCase();
           const paramIndex = signature.parameters.findIndex(
             p => p.label.toLowerCase() === name ||
@@ -252,7 +279,6 @@ exports.activate = function(context) {
           if (paramIndex !== -1) {
             currentIndex = paramIndex;
           } else {
-            // No match found — fallback to positional
             while (unnamedCounter < signature.parameters.length &&
                   namedArgsUsed.has(unnamedCounter)) {
               unnamedCounter++;
@@ -260,7 +286,6 @@ exports.activate = function(context) {
             currentIndex = unnamedCounter;
           }
         } else {
-          // Not starting with a letter/underscore → positional
           while (unnamedCounter < signature.parameters.length &&
                 namedArgsUsed.has(unnamedCounter)) {
             unnamedCounter++;
@@ -268,11 +293,9 @@ exports.activate = function(context) {
           currentIndex = unnamedCounter;
         }
 
-
         if (currentIndex === -1) {
-          currentIndex = 0; // fallback if unknown
+          currentIndex = 0;
         }
-
 
         const help = new vscode.SignatureHelp();
         help.signatures = [signature];
@@ -284,7 +307,7 @@ exports.activate = function(context) {
     }, '(', ',', ':'));
 
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('zscript', {
-        provideCompletionItems(document, position) {
+      provideCompletionItems(document, position) {
         const lineText = document.lineAt(position).text.substring(0, position.character);
         const wordMatch = lineText.match(/\b(\w*)$/);
         if (!wordMatch) return [];
@@ -307,6 +330,7 @@ exports.activate = function(context) {
 
     vscode.workspace.onDidOpenTextDocument(doc => {
       if (doc.languageId === 'zscript') {
+        outputChannel.appendLine('ZScript file opened, triggering parse if needed');
         if (!coreFunctionsParsed) {
           parsePk3(false);
           coreFunctionsParsed = true;
@@ -317,6 +341,7 @@ exports.activate = function(context) {
 
     vscode.window.onDidChangeActiveTextEditor(editor => {
       if (editor && editor.document.languageId === 'zscript') {
+        outputChannel.appendLine('ZScript editor activated, triggering parse if needed');
         if (!coreFunctionsParsed) {
           parsePk3(false);
           coreFunctionsParsed = true;
@@ -325,6 +350,7 @@ exports.activate = function(context) {
       }
     });
 
+    outputChannel.appendLine('ZScript extension fully initialized');
   } catch (error) {
     outputChannel.appendLine(`Extension activation failed: ${error.message}`);
     vscode.window.showErrorMessage(`ZScript extension failed: ${error.message}`);

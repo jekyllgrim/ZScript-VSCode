@@ -20,6 +20,7 @@
         "onCommand:zscript.parsePk3",
         "onCommand:zscript.parsePk3Verbose",
         "onCommand:zscript.listFiles",
+        "onCommand:zscript.browseGzdoomPk3",
         "onStartupFinished"
     ],
     "main": "./extension.js",
@@ -786,6 +787,10 @@
             {
                 "command": "zscript.listFiles",
                 "title": "ZScript: List ZScript Files in gzdoom.pk3"
+            },
+            {
+                "command": "zscript.browseGzdoomPk3",
+                "title": "ZScript: Browse for gzdoom.pk3 File"
             }
         ]
     },
