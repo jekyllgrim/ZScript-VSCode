@@ -109,6 +109,11 @@ function parsePk3(verbose = false) {
       return;
     }
 
+    if (!fs.existsSync(pk3Path)) {
+      vscode.window.showErrorMessage(`The file "${pk3Path}" does not exist. Please select a valid gzdoom.pk3 file using the "ZScript: Browse for gzdoom.pk3 File" command.`);
+      return;
+    }
+
     const zip = new AdmZip(pk3Path);
     const entries = zip.getEntries();
     functionSignatures.clear();
@@ -143,7 +148,6 @@ function parseProjectFromRootZScript(rootDoc) {
 
     if (!fs.existsSync(filePath)) return;
     const content = fs.readFileSync(filePath, 'utf8');
-    parseZScriptText(content, path.basename(filePath), false, projectLabel);
     totalFunctions += parseZScriptText(content, path.basename(filePath), false, projectLabel);
 
     const includeRegex = /^\s*#include\s+"([^"]+)"\s*$/gmi;
@@ -166,12 +170,9 @@ function tryParseProjectFromZScript(doc) {
 
   if (baseName === 'zscript' && !parsedProjectPaths.has(dirName.toLowerCase())) {
     try {
-      const siblingFiles = fs.readdirSync(dirName).map(f => path.parse(f).name.toLowerCase());
-      if (siblingFiles.includes('zscript')) {
-        outputChannel.appendLine(`Detected project root zscript in: ${dirName}`);
-        parseProjectFromRootZScript(doc);
-        parsedProjectPaths.add(dirName.toLowerCase());
-      }
+      outputChannel.appendLine(`Detected project root zscript in: ${dirName}`);
+      parseProjectFromRootZScript(doc);
+      parsedProjectPaths.add(dirName.toLowerCase());
     } catch (err) {
       outputChannel.appendLine(`Error checking sibling files in ${dirName}: ${err.message}`);
     }
@@ -252,7 +253,7 @@ exports.activate = function(context) {
             const name = raw.split(':')[0].trim().toLowerCase();
             const paramIndex = signature.parameters.findIndex(
               p => p.label.toLowerCase() === name ||
-                  p.label.toLowerCase().startsWith(name)
+                  p.label.toLowerCase().startsWith(name) // partial match
             );
             if (paramIndex !== -1) {
               namedArgsUsed.add(paramIndex);
