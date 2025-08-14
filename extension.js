@@ -258,9 +258,7 @@ exports.activate = function(context) {
             );
             if (paramIndex !== -1) {
               usedArgs.add(paramIndex);
-              if (paramIndex >= cursor) {
-                cursor = paramIndex + 1;
-              }
+              cursor = Math.max(cursor, paramIndex + 1);
             }
           } else {
             while (usedArgs.has(cursor) && cursor < signature.parameters.length) {
@@ -338,6 +336,16 @@ exports.activate = function(context) {
         return completions;
       }
     }, ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')));
+
+    vscode.workspace.textDocuments.forEach(doc => {
+      if (doc.languageId === 'zscript') {
+        if (!coreFunctionsParsed) {
+          parsePk3(false);
+          coreFunctionsParsed = true;
+        }
+        tryParseProjectFromZScript(doc);
+      }
+    });
 
     vscode.workspace.onDidOpenTextDocument(doc => {
       if (doc.languageId === 'zscript') {
