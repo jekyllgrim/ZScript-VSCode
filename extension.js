@@ -244,34 +244,42 @@ exports.activate = function(context) {
 
         const rawArgs = argsText.split(','); // do not trim everything yet
         let currentArgIndex = rawArgs.length - 1; // index in typed args
-        let namedArgsUsed = new Set();
-        let unnamedCounter = 0;
+        let usedArgs = new Set();
+        let cursor = 0;
 
+        // Process previous args to mark used parameters
         for (let i = 0; i < currentArgIndex; i++) {
           const raw = rawArgs[i].trim();
           if (raw.includes(':')) {
             const name = raw.split(':')[0].trim().toLowerCase();
             const paramIndex = signature.parameters.findIndex(
               p => p.label.toLowerCase() === name ||
-                  p.label.toLowerCase().startsWith(name) // partial match
+                  p.label.toLowerCase().startsWith(name)
             );
             if (paramIndex !== -1) {
-              namedArgsUsed.add(paramIndex);
+              usedArgs.add(paramIndex);
+              if (paramIndex >= cursor) {
+                cursor = paramIndex + 1;
+              }
             }
           } else {
-            while (unnamedCounter < signature.parameters.length &&
-                  namedArgsUsed.has(unnamedCounter)) {
-              unnamedCounter++;
+            while (usedArgs.has(cursor) && cursor < signature.parameters.length) {
+              cursor++;
             }
-            unnamedCounter++;
+            if (cursor < signature.parameters.length) {
+              usedArgs.add(cursor);
+              cursor++;
+            }
           }
         }
 
+        // Now detect the param for the *current* arg being typed
         const currentRaw = rawArgs[currentArgIndex].trim();
         let currentIndex;
         const colonPos = currentRaw.indexOf(':');
         const firstToken = (colonPos !== -1 ? currentRaw.split(':')[0] : currentRaw).trim();
         if (/^[A-Za-z_]/.test(firstToken)) {
+          // Try matching as a (full or partial) parameter name
           const name = firstToken.toLowerCase();
           const paramIndex = signature.parameters.findIndex(
             p => p.label.toLowerCase() === name ||
@@ -280,23 +288,25 @@ exports.activate = function(context) {
           if (paramIndex !== -1) {
             currentIndex = paramIndex;
           } else {
-            while (unnamedCounter < signature.parameters.length &&
-                  namedArgsUsed.has(unnamedCounter)) {
-              unnamedCounter++;
+            // No match found — fallback to positional
+            while (usedArgs.has(cursor) && cursor < signature.parameters.length) {
+              cursor++;
             }
-            currentIndex = unnamedCounter;
+            currentIndex = cursor;
           }
         } else {
-          while (unnamedCounter < signature.parameters.length &&
-                namedArgsUsed.has(unnamedCounter)) {
-            unnamedCounter++;
+          // Not starting with a letter/underscore → positional
+          while (usedArgs.has(cursor) && cursor < signature.parameters.length) {
+            cursor++;
           }
-          currentIndex = unnamedCounter;
+          currentIndex = cursor;
         }
 
-        if (currentIndex === -1) {
-          currentIndex = 0;
+
+        if (currentIndex === -1 || currentIndex >= signature.parameters.length) {
+          currentIndex = 0; // fallback if unknown or out of bounds
         }
+
 
         const help = new vscode.SignatureHelp();
         help.signatures = [signature];
@@ -308,7 +318,7 @@ exports.activate = function(context) {
     }, '(', ',', ':'));
 
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider('zscript', {
-      provideCompletionItems(document, position) {
+        provideCompletionItems(document, position) {
         const lineText = document.lineAt(position).text.substring(0, position.character);
         const wordMatch = lineText.match(/\b(\w*)$/);
         if (!wordMatch) return [];
@@ -331,7 +341,6 @@ exports.activate = function(context) {
 
     vscode.workspace.onDidOpenTextDocument(doc => {
       if (doc.languageId === 'zscript') {
-        outputChannel.appendLine('ZScript file opened, triggering parse if needed');
         if (!coreFunctionsParsed) {
           parsePk3(false);
           coreFunctionsParsed = true;
@@ -342,7 +351,6 @@ exports.activate = function(context) {
 
     vscode.window.onDidChangeActiveTextEditor(editor => {
       if (editor && editor.document.languageId === 'zscript') {
-        outputChannel.appendLine('ZScript editor activated, triggering parse if needed');
         if (!coreFunctionsParsed) {
           parsePk3(false);
           coreFunctionsParsed = true;
@@ -351,7 +359,6 @@ exports.activate = function(context) {
       }
     });
 
-    outputChannel.appendLine('ZScript extension fully initialized');
   } catch (error) {
     outputChannel.appendLine(`Extension activation failed: ${error.message}`);
     vscode.window.showErrorMessage(`ZScript extension failed: ${error.message}`);
