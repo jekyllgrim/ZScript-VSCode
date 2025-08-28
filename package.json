@@ -1,13 +1,13 @@
 {
-    "name": "gzdoom-zscript",
-    "displayName": "GZDoom ZScript",
+    "name": "gzdoom-zscript-extended",
+    "displayName": "GZDoom ZScript with function tooltips",
     "description": "GZDoom's multiple scripting languages support (with a focus on ZScript) for VSCode (and compatible editors)",
     "publisher": "kaptainmicila",
     "icon": "icons/GZDoom.png",
     "version": "1.9.6",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/KaptainMicila/ZScript-VSCode.git"
+        "url": "git+https://github.com/jekyllgrim/ZScript-VSCode/tree/master"
     },
     "engines": {
         "vscode": "^1.80.0"
