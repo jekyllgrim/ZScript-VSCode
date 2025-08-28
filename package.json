@@ -19,7 +19,6 @@
         "onLanguage:zscript",
         "onCommand:zscript.parsePk3",
         "onCommand:zscript.parsePk3Verbose",
-        "onCommand:zscript.listFiles",
         "onStartupFinished"
     ],
     "main": "./extension.js",
@@ -782,10 +781,6 @@
             {
                 "command": "zscript.parsePk3Verbose",
                 "title": "ZScript: Parse gzdoom.pk3 for Functions (Verbose Debugging)"
-            },
-            {
-                "command": "zscript.listFiles",
-                "title": "ZScript: List ZScript Files in gzdoom.pk3"
             }
         ]
     },
